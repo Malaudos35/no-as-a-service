@@ -3,7 +3,13 @@ services:
     build:
       context: .
       dockerfile: naas.Dockerfile
+    
     ports:
       - "5000:5000"
     environment:
       - FLASK_ENV=development
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'  # Limite le CPU à 0.5 (50% d'un CPU)
+          memory: '250M'  # Limite la RAM à 250 Mo
