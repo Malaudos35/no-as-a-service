@@ -19,4 +19,7 @@ COPY ./code/ .
 EXPOSE 5000
 
 # Commande pour exécuter l'application Flask
-CMD ["python", "app.py"]
+#CMD ["python", "app.py"]
+
+# Commande pour exécuter l'application avec Gunicorn
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "wsgi:app"]
