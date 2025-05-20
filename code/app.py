@@ -4,9 +4,20 @@ import random
 
 app = Flask(__name__)
 
+# Dictionnaire pour mettre en cache les fichiers JSON
+cached_reasons = {}
+
 def load_reasons(lang):
+    # Test if we have data in cache
+    if lang in cached_reasons:
+        return cached_reasons[lang]
+
+    # Get data from json file
     with open(f'reason/{lang}.json', 'r', encoding='utf-8') as file:
         data = json.load(file)
+
+    # Put data in cache
+    cached_reasons[lang] = data
     return data
 
 @app.route('/')
