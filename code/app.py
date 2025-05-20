@@ -13,7 +13,11 @@ def load_reasons(lang):
 def home():
     return render_template('index.html')
 
-@app.route('/random-reason/<lang>', methods=['GET'])
+@app.route('/no')
+def home2():
+    return render_template('index.html')
+
+@app.route('/no/<lang>', methods=['GET'])
 def get_random_reason(lang):
     try:
         reasons = load_reasons(lang)

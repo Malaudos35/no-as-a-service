@@ -3,9 +3,8 @@ services:
     build:
       context: .
       dockerfile: naas.Dockerfile
-    
-    ports:
-      - "5000:5000"
+    # ports:
+    #   - "5000:5000"
     environment:
       - FLASK_ENV=development
     deploy:
@@ -13,3 +12,16 @@ services:
         limits:
           cpus: '0.5'  # Limite le CPU à 0.5 (50% d'un CPU)
           memory: '250M'  # Limite la RAM à 250 Mo
+    networks:
+      - lvp-networks
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.web.rule=Host(`${URL}`)"
+      - "traefik.http.routers.web.entrypoints=websecure"
+      - "traefik.http.routers.web.tls.certresolver=myresolver"
+      - "traefik.http.services.web.loadbalancer.server.port=5000"
+      - "traefik.docker.network=lvp-networks"
+
+networks:
+  lvp-networks:
+    external: true

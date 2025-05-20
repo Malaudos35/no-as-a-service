@@ -1,0 +1,37 @@
+services:
+  traefik:
+    build:
+      context: traefik
+      dockerfile: traefik.Dockerfile
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: "500m"
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.email=${EMAIL}"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "traefik_letsencrypt:/letsencrypt"
+    labels:
+      - "traefik.enable=true"
+    networks:
+      - lvp-networks
+
+volumes:
+  traefik_letsencrypt:
+
+networks:
+  lvp-networks:
+    external: true
+      

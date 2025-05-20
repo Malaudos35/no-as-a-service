@@ -1,0 +1,13 @@
+http:
+  routers:
+    web_vm:
+      rule: "Host(`pve.lvp.ovh`)"
+      service: web_vm
+      entryPoints:
+      - "web"
+
+  services:
+    web_vm:
+      loadBalancer:
+        servers:
+        - url: "https://192.168.1.144:8006/" # Replace with your web VM IP and port
