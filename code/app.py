@@ -35,6 +35,21 @@ def load_hireme(lang):
     cached_hireme[lang] = data
     return data
 
+cached_dateme = {}
+
+def load_dateme(lang):
+    # Test if we have data in cache
+    if lang in cached_dateme:
+        return cached_dateme[lang]
+
+    # Get data from json file
+    with open(f'dateme/{lang}.json', 'r', encoding='utf-8') as file:
+        data = json.load(file)
+
+    # Put data in cache
+    cached_dateme[lang] = data
+    return data
+
 @app.route('/')
 def home():
     return render_template('reason.html')
@@ -63,6 +78,22 @@ def hireme():
 def get_random_hireme(lang):
     try:
         reasons = load_hireme(lang)
+        random_reason = random.choice(reasons)
+        response = jsonify({"reason": random_reason})
+        response.data = json.dumps({"reason": random_reason}, ensure_ascii=False)
+        response.headers['Content-Type'] = 'application/json; charset=utf-8'
+        return response
+    except FileNotFoundError:
+        return jsonify({"error": "Language not supported"}), 404
+    
+@app.route('/dateme')
+def dateme():
+    return render_template('dateme.html')
+
+@app.route('/dateme/<lang>', methods=['GET'])
+def get_random_dateme(lang):
+    try:
+        reasons = load_dateme(lang)
         random_reason = random.choice(reasons)
         response = jsonify({"reason": random_reason})
         response.data = json.dumps({"reason": random_reason}, ensure_ascii=False)
