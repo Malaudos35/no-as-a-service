@@ -3,7 +3,7 @@ import json
 import random
 
 app = Flask(__name__)
-
+root="/api"
 # Dictionnaire pour mettre en cache les fichiers JSON
 cached_reasons = {}
 
@@ -52,13 +52,13 @@ def load_dateme(lang):
 
 @app.route('/')
 def home():
-    return render_template('reason.html')
+    return render_template('reason.html', root=root)
 
-@app.route('/no')
+@app.route(f'{root}/no')
 def no():
-    return render_template('reason.html')
+    return render_template('reason.html', root=root)
 
-@app.route('/no/<lang>', methods=['GET'])
+@app.route(f'{root}/no/<lang>', methods=['GET'])
 def get_random_reason(lang):
     try:
         reasons = load_reasons(lang)
@@ -70,11 +70,11 @@ def get_random_reason(lang):
     except FileNotFoundError:
         return jsonify({"error": "Language not supported"}), 404
     
-@app.route('/hireme')
+@app.route(f'{root}/hireme')
 def hireme():
-    return render_template('hireme.html')
+    return render_template('hireme.html', root=root)
 
-@app.route('/hireme/<lang>', methods=['GET'])
+@app.route(f'{root}/hireme/<lang>', methods=['GET'])
 def get_random_hireme(lang):
     try:
         reasons = load_hireme(lang)
@@ -86,11 +86,11 @@ def get_random_hireme(lang):
     except FileNotFoundError:
         return jsonify({"error": "Language not supported"}), 404
     
-@app.route('/dateme')
+@app.route(f'{root}/dateme')
 def dateme():
-    return render_template('dateme.html')
+    return render_template('dateme.html', root=root)
 
-@app.route('/dateme/<lang>', methods=['GET'])
+@app.route(f'{root}/dateme/<lang>', methods=['GET'])
 def get_random_dateme(lang):
     try:
         reasons = load_dateme(lang)

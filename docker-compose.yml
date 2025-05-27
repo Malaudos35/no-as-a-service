@@ -16,7 +16,7 @@ services:
       - lvp-networks
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.web.rule=Host(`${URL}`)"
+      - "traefik.http.routers.web.rule=Host(`${URL}`) && PathPrefix(`/api`)"
       - "traefik.http.routers.web.entrypoints=websecure"
       - "traefik.http.routers.web.tls.certresolver=myresolver"
       - "traefik.http.services.web.loadbalancer.server.port=5000"
