@@ -21,7 +21,8 @@ services:
       - "traefik.http.routers.web.tls.certresolver=myresolver"
       - "traefik.http.services.web.loadbalancer.server.port=5000"
       - "traefik.docker.network=lvp-networks"
-
+    restart: on-failure:5
+    
 networks:
   lvp-networks:
     external: true
