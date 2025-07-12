@@ -6,7 +6,9 @@ services:
     # ports:
     #   - "5000:5000"
     environment:
-      - FLASK_ENV=development
+      FLASK_ENV: development
+      TZ: Europe/Paris
+
     deploy:
       resources:
         limits:
