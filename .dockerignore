@@ -59,3 +59,13 @@ clean_list_doublons.py
 docker-compose.yaml
 makefile
 main.py
+
+
+.github
+no_as_a_service.egg-info
+.tests_cache
+
+*.p12
+*.pfx
+
+scripts

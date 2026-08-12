@@ -2,15 +2,10 @@ name: NAAS-CI
 
 on:
   pull_request:
-    branches:
-    - main
-
+    branches: [ "main" ]
   push:
-    branches:
-    - main
-    tags:
-    - "v*.*.*"
-
+    branches: [ "main" ]
+    tags: [ "v*" ]
   workflow_dispatch:
 
 
@@ -20,19 +15,17 @@ concurrency:
 
 permissions:
   contents: read
-  packages: write
-
-env:
-  PYTHON_VERSION: "3.12"
 
 jobs:
-  tests:
-    name: Lint and tests
+  quality:
+    name: Quality + tests + security
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
+    - name: Checkout
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Install uv
       uses: astral-sh/setup-uv@v6
@@ -41,27 +34,18 @@ jobs:
         enable-cache: true
         cache-dependency-glob: uv.lock
 
-    - name: Install Python
+    - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ env.PYTHON_VERSION }}
+        python-version-file: pyproject.toml
 
-    - name: Check uv.lock
-      run: uv lock --check
-
-    - name: Install dependencies
+    - name: Sync dependencies
       run: uv sync --locked --all-groups
 
-    - name: Run formatting checks
-      run: make format-check
+    - name: Quality checks
+      run: make check
 
-    - name: Run lint checks
-      run: make lint
-
-    - name: Run tests with coverage
-      run: make test-cov
-
-    - name: Upload HTML coverage report
+    - name: Upload coverage
       if: always()
       uses: actions/upload-artifact@v4
       with:
@@ -70,28 +54,49 @@ jobs:
         if-no-files-found: ignore
         retention-days: 7
 
-  docker:
-    name: Build and push Docker image
+  secret-scan:
+    name: Secret scan
     runs-on: ubuntu-latest
-    needs:
-    - tests
+
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
 
-    # Les noms d’images Docker doivent être en minuscules.
-    - name: Generate image name
-      id: image
-      shell: bash
-      run: |
-        IMAGE_NAME="ghcr.io/${GITHUB_REPOSITORY,,}"
-        echo "name=${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+    - name: Scan repository with Gitleaks
+      uses: gitleaks/gitleaks-action@v3
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITLEAKS_CONFIG: .gitleaks.toml
+        GITLEAKS_ENABLE_COMMENTS: "true"
+        GITLEAKS_ENABLE_SUMMARY: "true"
+        GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "true"
 
-    - name: Set up Docker Buildx
+  docker:
+    name: Build, scan and push image
+    runs-on: ubuntu-latest
+    needs: [ quality, secret-scan ]
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Buildx
       uses: docker/setup-buildx-action@v3
 
-    - name: Log in to GitHub Container Registry
+    - name: Build image name
+      id: image
+      run: |
+        echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+    - name: Login to GHCR
       if: github.event_name != 'pull_request'
       uses: docker/login-action@v3
       with:
@@ -99,29 +104,59 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Generate Docker metadata
+    - name: Build image for security scan
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        file: ./naas.Dockerfile
+        push: false
+        load: true
+        tags: ${{ steps.image.outputs.name }}:ci-${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Scan image with Trivy (critical/high)
+      uses: aquasecurity/trivy-action@v0.3.1
+      with:
+        image-ref: ${{ steps.image.outputs.name }}:ci-${{ github.sha }}
+        format: table
+        vuln-type: os,library
+        severity: CRITICAL,HIGH
+        ignore-unfixed: true
+        exit-code: "1"
+
+    - name: Generate Docker tags
       id: metadata
       uses: docker/metadata-action@v5
       with:
         images: ${{ steps.image.outputs.name }}
         tags: |
           type=raw,value=latest,enable={{is_default_branch}}
-          type=ref,event=branch
-          type=ref,event=pr
           type=sha,prefix=sha-
+          type=ref,event=branch
+          type=ref,event=tag
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
-        labels: |
-          org.opencontainers.image.title=no-as-a-service
-          org.opencontainers.image.description=No as a Service
 
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v6
+    - name: Push image to GHCR (only on non-PR)
+      if: github.event_name != 'pull_request'
+      run: |
+        while IFS= read -r tag; do
+          docker tag "${{ steps.image.outputs.name }}:ci-${{ github.sha }}" "$tag"
+          docker push "$tag"
+        done <<< "${{ steps.metadata.outputs.tags }}"
+
+    - name: Generate SBOM
+      if: github.event_name != 'pull_request'
+      uses: anchore/sbom-action@v0
       with:
-        context: .
-        file: ./naas.Dockerfile
-        push: ${{ github.event_name != 'pull_request' }}
-        tags: ${{ steps.metadata.outputs.tags }}
-        labels: ${{ steps.metadata.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        image: ${{ steps.image.outputs.name }}:ci-${{ github.sha }}
+        format: cyclonedx-json
+        output-file: sbom.json
+
+    - name: Upload SBOM
+      if: github.event_name != 'pull_request'
+      uses: actions/upload-artifact@v4
+      with:
+        name: sbom
+        path: sbom.json
