@@ -9,7 +9,8 @@ SERVICE := naas
 .PHONY: help install sync lock lock-upgrade \
 	lint lint-fix format format-check \
 	test test-unit test-functional test-cov check \
-	build up down restart ps logs shell clean
+	build image-build image-run \
+	up down restart ps logs shell clean
 
 help: ## Display available commands
 	@echo "Available commands:"
@@ -84,3 +85,15 @@ clean: ## Remove generated files
 	rm -rf .coverage
 	rm -rf htmlcov
 	find . -type d -name "__pycache__" -prune -exec rm -rf {} +
+
+image-build: ## Build the application Docker image
+	docker build \
+		--file $(DOCKERFILE) \
+		--tag $(IMAGE):$(IMAGE_TAG) \
+		.
+
+image-run: ## Run the application Docker image
+	docker run --rm \
+		--name $(SERVICE) \
+		--publish 5000:5000 \
+		$(IMAGE):$(IMAGE_TAG)

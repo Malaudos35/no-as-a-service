@@ -56,3 +56,6 @@ init.sh
 
 # Others
 clean_list_doublons.py
+docker-compose.yaml
+makefile
+main.py
