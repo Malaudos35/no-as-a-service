@@ -1,4 +1,5 @@
 import json
+import os
 import random
 from pathlib import Path
 from typing import Any
@@ -40,6 +41,24 @@ def random_response(category: str, language: str):
 @app.get("/")
 def home():
     return render_template("reason.html", root=API_ROOT)
+
+
+@app.get("/healthz")
+def healthz():
+    return jsonify(status="ok"), 200
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()"
+    if os.getenv("FORCE_HTTPS", "false").lower() in ("1", "true", "yes"):
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains; preload"
+        )
+    return response
 
 
 @app.get(f"{API_ROOT}/no")

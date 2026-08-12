@@ -4,14 +4,18 @@ UV := uv
 COMPOSE := docker compose
 SERVICE := naas
 
+PYTHON_DIRS := naas tests scripts
+DOCKERFILE := naas.Dockerfile
+IMAGE_NAME ?= no-as-a-service
+IMAGE_TAG ?= latest
+
 .DEFAULT_GOAL := help
 
 .PHONY: help install sync lock lock-upgrade \
 	lint lint-fix format format-check \
 	test test-unit test-functional test-cov check \
-	pre-commit pre-commit-run \
-	build up down restart ps logs shell clean
-
+	security-python security pre-commit pre-commit-run \
+	build up down restart ps logs shell clean image-build image-run image-push
 
 help: ## Display available commands
 	@echo "Available commands:"
@@ -30,16 +34,16 @@ lock-upgrade: ## Upgrade all dependencies and update uv.lock
 	$(UV) lock --upgrade
 
 lint: ## Run Ruff checks
-	$(UV) run ruff check naas tests
+	$(UV) run ruff check $(PYTHON_DIRS)
 
 lint-fix: ## Fix Ruff errors
-	$(UV) run ruff check --fix naas tests
+	$(UV) run ruff check --fix $(PYTHON_DIRS)
 
 format: ## Format Python files
-	$(UV) run ruff format naas tests
+	$(UV) run ruff format $(PYTHON_DIRS)
 
 format-check: ## Check Python formatting
-	$(UV) run ruff format --check naas tests
+	$(UV) run ruff format --check $(PYTHON_DIRS)
 
 test: ## Run all tests
 	$(UV) run pytest
@@ -55,12 +59,36 @@ test-cov: ## Run tests with coverage
 		--cov=naas \
 		--cov-branch \
 		--cov-report=term-missing \
-		--cov-report=html
+		--cov-report=html \
+		--cov-fail-under=80
 
-check: format-check lint test-cov ## Run all quality checks
+security-python: ## Python security checks
+	$(UV) run bandit -r naas scripts -ll
+	$(UV) run pip-audit --skip-editable
+
+security: ## All local security checks
+	$(UV) run pre-commit run --all-files
+
+check: format-check lint test-cov security-python ## Run all quality + security checks
+
+pre-commit: ## Install local pre-commit and pre-push hooks
+	$(UV) run pre-commit install
+	$(UV) run pre-commit install --hook-type pre-push
+
+pre-commit-run: ## Run all pre-commit hooks
+	$(UV) run pre-commit run --all-files
 
 build: ## Build the Docker image
 	$(COMPOSE) build
+
+image-build: ## Build application docker image with the project dockerfile
+	docker build -f $(DOCKERFILE) -t $(IMAGE_NAME):$(IMAGE_TAG) .
+
+image-run: ## Run image locally
+	docker run --rm -p 5000:5000 --name $(SERVICE) $(IMAGE_NAME):$(IMAGE_TAG)
+
+image-push: ## Push local image
+	docker push $(IMAGE_NAME):$(IMAGE_TAG)
 
 up: ## Start all services
 	$(COMPOSE) up -d --build
@@ -86,22 +114,3 @@ clean: ## Remove generated files
 	rm -rf .coverage
 	rm -rf htmlcov
 	find . -type d -name "__pycache__" -prune -exec rm -rf {} +
-
-image-build: ## Build the application Docker image
-	docker build \
-		--file $(DOCKERFILE) \
-		--tag $(IMAGE):$(IMAGE_TAG) \
-		.
-
-image-run: ## Run the application Docker image
-	docker run --rm \
-		--name $(SERVICE) \
-		--publish 5000:5000 \
-		$(IMAGE):$(IMAGE_TAG)
-
-pre-commit: ## Install Git pre-commit and pre-push hooks
-	$(UV) run pre-commit install
-	$(UV) run pre-commit install --hook-type pre-push
-
-pre-commit-run: ## Run all pre-commit hooks manually
-	$(UV) run pre-commit run --all-files
