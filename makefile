@@ -9,8 +9,9 @@ SERVICE := naas
 .PHONY: help install sync lock lock-upgrade \
 	lint lint-fix format format-check \
 	test test-unit test-functional test-cov check \
-	build image-build image-run \
-	up down restart ps logs shell clean
+	pre-commit pre-commit-run \
+	build up down restart ps logs shell clean
+
 
 help: ## Display available commands
 	@echo "Available commands:"
@@ -97,3 +98,10 @@ image-run: ## Run the application Docker image
 		--name $(SERVICE) \
 		--publish 5000:5000 \
 		$(IMAGE):$(IMAGE_TAG)
+
+pre-commit: ## Install Git pre-commit and pre-push hooks
+	$(UV) run pre-commit install
+	$(UV) run pre-commit install --hook-type pre-push
+
+pre-commit-run: ## Run all pre-commit hooks manually
+	$(UV) run pre-commit run --all-files
