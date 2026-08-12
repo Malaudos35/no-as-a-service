@@ -1,0 +1,70 @@
+services:
+  traefik:
+    image: docker.io/library/traefik:latest
+    container_name: traefik
+
+    command:
+      # Dashboard
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+
+      # Docker provider
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+
+      # HTTP and HTTPS
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+
+      # Let's Encrypt
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${EMAIL:?EMAIL is required}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+
+    ports:
+      - "80:80"
+      - "443:443"
+      - "127.0.0.1:8080:8080"
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_letsencrypt:/letsencrypt
+
+    networks:
+      - web
+
+    restart: unless-stopped
+
+  naas:
+    build:
+      context: .
+      dockerfile: naas.Dockerfile
+    container_name: naas
+
+    environment:
+      FLASK_ENV: production
+      TZ: Europe/Paris
+
+    expose:
+      - "5000"
+
+    networks:
+      - web
+
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.naas.rule: "Host(`${URL:?URL is required}`) && PathPrefix(`/api`)"
+      traefik.http.routers.naas.entrypoints: "websecure"
+      traefik.http.routers.naas.tls: "true"
+      traefik.http.routers.naas.tls.certresolver: "letsencrypt"
+      traefik.http.services.naas.loadbalancer.server.port: "5000"
+
+    restart: unless-stopped
+
+volumes:
+  traefik_letsencrypt:
+
+networks:
+  web:
