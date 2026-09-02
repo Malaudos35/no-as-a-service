@@ -116,7 +116,7 @@ jobs:
         cache-to: type=gha,mode=max
 
     - name: Scan image with Trivy (critical/high)
-      uses: aquasecurity/trivy-action@v0.3.1
+      uses: aquasecurity/trivy-action@v0.36.0
       with:
         image-ref: ${{ steps.image.outputs.name }}:ci-${{ github.sha }}
         format: table
